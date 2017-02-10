@@ -2,7 +2,7 @@
 """
 Created on Tue Feb 07 13:11:50 2017
 
-@author:xieyuxi
+@author: xie yuxi
 """
 
 from math import log
@@ -65,7 +65,7 @@ def calcShannonEnt(dataSet):
     # 返回这个数据集的熵
     return shannonEnt
 
-data, label = createDataSet()
+
 
 """将传入的数据集 dataSet 按 axis 属性列的具体值 value 拆出一个子数据集 subdataset
 1、先建立一个新的 List 用于存储新的子数据集
@@ -191,3 +191,107 @@ def chooseBestFeatureToSplit(dataSet):
     # 仅仅返回最大信息增益对应的特征属性的序号值
     return bestFeature
 
+""" 选出传入的类别列表中出现次数最多的类别
+1、先建立一个新字用于存储 {类别 ： 出现次数}
+2、遍历类别列表，如果类别不在字典 classCount 中时，类别的出现次数初始化为 0，
+                    如果类别在字典中，则该类别的出现次数加 1
+3、将字典中出现的  {类别 ： 出现次数} 按出现的次数正序排序
+4、选出其中出现次数最多的一个类别
+
+Args:
+    classList ： 传入的类别列表（注意这里传入的是类别列表）
+
+Returns:
+       出现次数最多对应的类别
+
+Raises:
+    None
+"""
+def majorityCnt(classList):
+    # 建立新字典用于存放 {特征标签 ： 出现次数} 对
+    classCount={}
+    # 遍历特征列表中的特征
+    for vote in classList:
+        # 如果特征不在字典classCount中时
+        if vote not in classCount.keys():
+            # 将其添加进字典，并且出现次数初始化为0
+            classCount[vote] = 0
+        # 如果存在，则该特征出现次数加1
+        classCount[vote] += 1
+    # 将获得的classCount字典变为可迭代类型，并按照第一个域，也就是出现次数排序
+    sortedClassCount = sorted(classCount.iteritems(), key=operator.itemgetter(1), reverse=True)
+    # 返回排名第一的 {特征标签 ： 出现次数} 对子中的特征标签
+    return sortedClassCount[0][0]
+
+
+""" 构建决策树
+1、根据传入的数据集，先找出最优特征标签作父节点
+2、接着特征的具体取值看做分支条件,将数据划分为不同的子数据集（分支）
+3、采用递归自己调用自己，为分支再找最优特征，再在分支上建立分支
+4、直到要不所有剩下的实例都是一类，或者特征只剩下一个，停止递归，并返回构件好的决策树
+
+Args:
+    dataSet ： 传入需要构建决策树的数据集
+    labels ： 传入的数据集对应的特征标签
+
+Returns:
+       返回构件好的决策树
+
+Raises:
+    None
+"""
+def createTree(dataSet,labels):
+    # 新建一个列表来存储类别
+    # 以下等同于：
+    # for example in dataSet:
+    #       classList.append(example[-1])
+    classList = [example[-1] for example in dataSet]
+    # 如果当classList中的所有类别都一样时，则停止划分子数据集
+    # count()函数用于统计字符串里某个字符出现的次数并返回该字符串出现次数
+    if classList.count(classList[0]) == len(classList):
+        # 当 classList 中都是一个类别时，就返回这个类别，做决策树的叶子
+        # 因为此时 classList 中的类别都一样，所以选第一个做代表 classList[0]
+        return classList[0]
+    # 如果当传入数据集只剩一个特征，即只剩一列时，但是这一列里还有不同的类别
+    # 也就是所有标签都用完还没有把剩下的实例分好类，那么就返回出现次数最多的类别
+    if len(dataSet[0]) == 1:
+        # 调用函数 majorityCnt()，并返回出现次数最多的类别做这个判断分支的类别
+        return majorityCnt(classList)
+    # 通过函数 chooseBestFeatureToSplit() 从传入的 dataSet中选出最优特征的序号
+    bestFeat = chooseBestFeatureToSplit(dataSet)
+    # 通过序号在传入的 Labels 中找到对应的特征标签
+    bestFeatLabel = labels[bestFeat]
+    # 构建决策树，字典中包含字典，每一层都选最优标签做父节点
+    myTree = {bestFeatLabel:{}}
+    # 标签使用过一次后就将其从 Labels 中删除，因为一个特征标签只能用一次
+    del(labels[bestFeat])
+    # 这里是需要找到得出来的最好的特征标签下所有的取值，为划分子数据集准备
+    # 以下等同于：
+    #       for example in dataSet:
+    #           featValues.append(example[bestfeat])
+    featValues = [example[bestFeat] for example in dataSet]
+    # 构建一个 set 来储存最优特征下的所取得值（如果有多个值，只留一个）
+    uniqueVals = set(featValues)
+    # 遍历这个最优特征下取到的不重复的值
+    for value in uniqueVals:
+        # 建立新的 subLabels 来拷贝原 labels, 这样不会影响原来的标签
+        # 此时的 subLabels 剔除了本轮最优标签
+        subLabels = labels[:]
+        # 这里是使用递归调用自己，不停地为每个分支再创建分支，直到两个if中的一个出现
+        #       - 要不是剩余实例都是一个类别
+        #       - 要不是标签只剩一个，但是类还没分出来
+        # 其中先使用splitDataSet（）函数将传入数据集按标签和取值分类，传入子标签
+        # createTree()函数返回的是一个判断路径走到底的类别（叶子节点）
+        # myTree[bestFeatLabel][value]结合决策树图形来理解：
+        #       - bsetFeatLabel 是树的节点，value是决策树判断的分支
+        #           - 如果某个分支已经分好了类别，满足if条件，
+        #           则 myTree[bestFeatLabel][value] 就返回这个分支的类别（叶子）
+        #           - 如果分支还没有分好类，就递归再调用自己再找最有标签分类
+        #           - 直到符合if条件之一，这样每个分支最终都是一个类别（叶子）
+        myTree[bestFeatLabel][value] = createTree(splitDataSet(dataSet, bestFeat, value),subLabels)
+    return myTree
+
+
+myDat,labels = createDataSet()
+
+myTree = createTree(myDat,labels)
